@@ -28,8 +28,17 @@ public interface CuratorConfig {
     @Default("/outlinc-discovery")
     String getBasePath();
 
+
     @Config("discovery.curator.providerStrategy")
     @Default("RoundRobin")
     ServiceProducer.Strategy getProviderStrategy();
+
+    @Config("discovery.curator.downInstanceTimeout")
+    @Default("30000")
+    long getDownInstanceTimeoutMs();
+
+    @Config("discovery.curator.downInstanceThreshold")
+    @Default("2")
+    int getDownInstanceThreshold();
 
 }

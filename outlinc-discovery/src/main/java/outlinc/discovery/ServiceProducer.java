@@ -9,8 +9,8 @@ public interface ServiceProducer<Content> {
         RoundRobin, Random, Sticky
     }
 
-    Content produce(String serviceName);
+    ServiceEntity<Content> produce(String serviceName);
 
-    Content produce(String serviceName, Strategy strategy);
+    ServiceEntity<Content> produce(String serviceName, Strategy strategy);
 
 }

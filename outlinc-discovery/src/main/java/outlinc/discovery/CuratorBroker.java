@@ -18,36 +18,37 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by wangkang on 17/06/2017
  */
-public class CuratorImpl<Content>
+public class CuratorBroker<Content>
     implements
     CuratorListener,
     ServiceBroker<Content>,
     ServiceRegistry<Content>,
     ServiceProducer<Content> {
 
-    private final static Logger log = LoggerFactory.getLogger(CuratorImpl.class);
-    private ServiceDiscovery<Content> discovery;
-    private final Class<Content> contentClass;
+    private final static Logger log = LoggerFactory.getLogger(CuratorBroker.class);
     private final CuratorConfig config;
-    private final Map<String, ServiceInstance<Content>> instanceMap;
+    private final Class<Content> contentClass;
+    private final Map<String, ServiceInstance<Content>> registryMap;
     private final Map<String, ServiceProvider<Content>> providerMap;
+    private ServiceDiscovery<Content> discovery;
 
-    public CuratorImpl(Class<Content> contentClass) {
+    public CuratorBroker(Class<Content> contentClass) {
         this(new Properties(), contentClass);
     }
 
-    public CuratorImpl(Properties props, Class<Content> contentClass) {
+    public CuratorBroker(Properties props, Class<Content> contentClass) {
         this(new ConfigurationObjectFactory(props).build(CuratorConfig.class), contentClass);
     }
 
-    public CuratorImpl(CuratorConfig config, Class<Content> contentClass) {
-        this.contentClass = contentClass;
+    public CuratorBroker(CuratorConfig config, Class<Content> contentClass) {
         this.config = config;
-        this.instanceMap = new ConcurrentHashMap<String, ServiceInstance<Content>>();
+        this.contentClass = contentClass;
+        this.registryMap = new ConcurrentHashMap<String, ServiceInstance<Content>>();
         this.providerMap = new ConcurrentHashMap<String, ServiceProvider<Content>>();
     }
 
@@ -57,8 +58,7 @@ public class CuratorImpl<Content>
             CloseableUtils.closeQuietly(provider);
         }
         providerMap.clear();
-        //TODO close??
-        this.instanceMap.clear();
+        registryMap.clear();
         if (discovery != null) {
             CloseableUtils.closeQuietly(discovery);
             discovery = null;
@@ -78,12 +78,12 @@ public class CuratorImpl<Content>
     }
 
     @Override
-    public Content produce(String serviceName) {
+    public ServiceEntity<Content> produce(String serviceName) {
         return produce(serviceName, config.getProviderStrategy());
     }
 
     @Override
-    public Content produce(String serviceName, Strategy strategy) {
+    public ServiceEntity<Content> produce(String serviceName, Strategy strategy) {
         if (discovery == null) {
             return null;
         }
@@ -104,6 +104,12 @@ public class CuratorImpl<Content>
                         .serviceProviderBuilder()
                         .serviceName(serviceName)
                         .providerStrategy(makeProviderStrategy(strategy))
+                        //.threadFactory()
+                        //.additionalFilter()
+                        .downInstancePolicy(new DownInstancePolicy(
+                            config.getDownInstanceTimeoutMs(),
+                            TimeUnit.MILLISECONDS,
+                            config.getDownInstanceThreshold()))
                         .build();
                     provider.start();
                     providerMap.put(serviceName, provider);
@@ -114,14 +120,24 @@ public class CuratorImpl<Content>
             }
         }
         if (instance != null) {
-            return instance.getPayload();
+            return new ServiceEntity.Builder<Content>()
+                .instanceId(instance.getId())
+                .name(instance.getName())
+                .host(instance.getAddress())
+                .port(instance.getPort())
+                .sslPort(instance.getSslPort())
+                .content(instance.getPayload())
+                .uri(instance.buildUriSpec())
+                .enabled(instance.isEnabled())
+                .registerUTC(instance.getRegistrationTimeUTC())
+                .build();
         }
         return null;
     }
 
     @Override
     public String register(String serviceName, Content content) {
-        ServiceNode<Content> node = new ServiceNode.Builder<Content>()
+        ServiceEntity<Content> node = new ServiceEntity.Builder<Content>()
             .name(serviceName)
             .content(content)
             .build();
@@ -129,37 +145,41 @@ public class CuratorImpl<Content>
     }
 
     @Override
-    public String register(ServiceNode<Content> node) {
+    public String register(ServiceEntity<Content> node) {
         if (discovery == null) {
             return "";
         }
         ServiceInstance<Content> instance = null;
         try {
-            instance = ServiceInstance.<Content>builder()
+            ServiceInstanceBuilder<Content> b = ServiceInstance.<Content>builder()
                 .name(node.getName())
-                .address(node.getHost())
+                .address(node.getAddress())
                 .port(node.getPort())
-                .sslPort(node.getSslPort())
-                .uriSpec(new UriSpec(node.getRawUriSpec()))
-                .enabled(node.isEnabled())
                 .payload(node.getContent())
-                .build();
+                .enabled(true);
+            if (node.getSslPort() != null) {
+                b.sslPort(node.getSslPort());
+            }
+            if (node.getUri() != null && node.getUri().length() > 0) {
+                b.uriSpec(new UriSpec(node.getUri()));
+            }
+            instance = b.build();
             discovery.registerService(instance);
             log.info("register {}", instance);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
         if (instance != null) {
-            instanceMap.put(instance.getId(), instance);
+            registryMap.put(instance.getId(), instance);
             return instance.getId();
         }
         return "";
     }
 
     @Override
-    public List<String> register(Collection<ServiceNode<Content>> nodes) {
+    public List<String> register(Collection<ServiceEntity<Content>> nodes) {
         ArrayList<String> ids = new ArrayList<String>(nodes.size());
-        for (ServiceNode<Content> node : nodes) {
+        for (ServiceEntity<Content> node : nodes) {
             ids.add(register(node));
         }
         return ids;
@@ -170,12 +190,12 @@ public class CuratorImpl<Content>
         if (discovery == null) {
             return Boolean.FALSE;
         }
-        if (!instanceMap.containsKey(instanceId)) {
+        if (!registryMap.containsKey(instanceId)) {
             return Boolean.FALSE;
         }
         try {
-            ServiceInstance<Content> instance = instanceMap.get(instanceId);
-            instanceMap.remove(instanceId);
+            ServiceInstance<Content> instance = registryMap.get(instanceId);
+            registryMap.remove(instanceId);
             discovery.unregisterService(instance);
             log.info("unregister {}", instance);
         } catch (Exception e) {

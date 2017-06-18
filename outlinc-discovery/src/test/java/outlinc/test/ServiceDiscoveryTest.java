@@ -41,9 +41,9 @@ public class ServiceDiscoveryTest {
     @Test
     public void test_02_provider() throws Exception {
         final String serviceName = "test.c";
-        List<ServiceNode<String>> nodes = new LinkedList<ServiceNode<String>>();
+        List<ServiceEntity<String>> nodes = new LinkedList<ServiceEntity<String>>();
         for (int i = 1; i < 6; i++) {
-            ServiceNode<String> node = new ServiceNode.Builder<String>()
+            ServiceEntity<String> node = new ServiceEntity.Builder<String>()
                 .name(serviceName)
                 .content("Service test.c#" + i)
                 .build();
@@ -51,11 +51,11 @@ public class ServiceDiscoveryTest {
         }
         ServiceRegistry<String> r = service.registry();
         List<String> ids = r.register(nodes);
-        ServiceProducer<String> provider = service.producer();
+        ServiceProducer<String> producer = service.producer();
         for (int i = 0; i < 50; i++) {
-            String content = provider.produce(serviceName);
-            Assert.assertNotNull(content);
-            log.debug(content);
+            ServiceEntity<String> entity = producer.produce(serviceName);
+            Assert.assertNotNull(entity);
+            log.debug(entity.toString());
         }
         r.unregister(ids);
     }
@@ -68,7 +68,7 @@ public class ServiceDiscoveryTest {
         Properties props = new Properties();
         props.load(inp);
         props.setProperty("discovery.curator.connectString", connectString());
-        service = new CuratorImpl<String>(props, String.class);
+        service = new CuratorBroker<String>(props, String.class);
     }
 
     @After

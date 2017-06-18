@@ -23,7 +23,7 @@ public interface ServiceRegistry<Content> {
      * @param node Config of a service instance
      * @return UUID of a service instance
      */
-    String register(ServiceNode<Content> node);
+    String register(ServiceEntity<Content> node);
 
     /**
      * Register several service instances
@@ -31,7 +31,7 @@ public interface ServiceRegistry<Content> {
      * @param nodes Configs of several service instances
      * @return UUIDs of service instances
      */
-    List<String> register(Collection<ServiceNode<Content>> nodes);
+    List<String> register(Collection<ServiceEntity<Content>> nodes);
 
     /**
      * Unregister a service instance
