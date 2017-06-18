@@ -52,13 +52,29 @@ public class ServiceDiscoveryTest {
         ServiceRegistry<String> r = service.registry();
         List<String> ids = r.register(nodes);
         ServiceProducer<String> producer = service.producer();
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 20; i++) {
             ServiceEntity<String> entity = producer.produce(serviceName);
             Assert.assertNotNull(entity);
-            log.debug(entity.toString());
+            log.info(entity.toString());
         }
         r.unregister(ids);
     }
+
+    @Test
+    public void test_03_error_reporting() throws InterruptedException {
+        final String serviceName = "test.e";
+        service.registry().register(serviceName, "Service Contents e");
+        ServiceProducer<String> producer = service.producer();
+        for (int i = 0; i < 2; i++) {
+            ServiceEntity<String> entity = producer.produce(serviceName);
+            producer.reportError(entity);
+            Assert.assertNotNull(entity);
+            log.info(entity.toString());
+        }
+        ServiceEntity<String> entity = producer.produce(serviceName);
+        Assert.assertNull(entity);
+    }
+
 
     private ServiceBroker<String> service = null;
 

@@ -16,8 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -33,8 +37,8 @@ public class CuratorBroker<Content>
     private final static Logger log = LoggerFactory.getLogger(CuratorBroker.class);
     private final CuratorConfig config;
     private final Class<Content> contentClass;
-    private final Map<String, ServiceInstance<Content>> registryMap;
-    private final Map<String, ServiceProvider<Content>> providerMap;
+    private final ConcurrentMap<String, ServiceInstance<Content>> instanceMap;
+    private final ConcurrentMap<String, ServiceProvider<Content>> providerMap;
     private ServiceDiscovery<Content> discovery;
 
     public CuratorBroker(Class<Content> contentClass) {
@@ -48,7 +52,7 @@ public class CuratorBroker<Content>
     public CuratorBroker(CuratorConfig config, Class<Content> contentClass) {
         this.config = config;
         this.contentClass = contentClass;
-        this.registryMap = new ConcurrentHashMap<String, ServiceInstance<Content>>();
+        this.instanceMap = new ConcurrentHashMap<String, ServiceInstance<Content>>();
         this.providerMap = new ConcurrentHashMap<String, ServiceProvider<Content>>();
     }
 
@@ -58,7 +62,7 @@ public class CuratorBroker<Content>
             CloseableUtils.closeQuietly(provider);
         }
         providerMap.clear();
-        registryMap.clear();
+        instanceMap.clear();
         if (discovery != null) {
             CloseableUtils.closeQuietly(discovery);
             discovery = null;
@@ -120,6 +124,7 @@ public class CuratorBroker<Content>
             }
         }
         if (instance != null) {
+            instanceMap.put(instance.getId(), instance);
             return new ServiceEntity.Builder<Content>()
                 .instanceId(instance.getId())
                 .name(instance.getName())
@@ -133,6 +138,15 @@ public class CuratorBroker<Content>
                 .build();
         }
         return null;
+    }
+
+    @Override
+    public void reportError(ServiceEntity<Content> entity) {
+        ServiceProvider<Content> provider = providerMap.get(entity.getName());
+        ServiceInstance<Content> instance = instanceMap.get(entity.getInstanceId());
+        if (provider != null && instance != null) {
+            provider.noteError(instance);
+        }
     }
 
     @Override
@@ -170,7 +184,7 @@ public class CuratorBroker<Content>
             log.error(e.getMessage(), e);
         }
         if (instance != null) {
-            registryMap.put(instance.getId(), instance);
+            instanceMap.put(instance.getId(), instance);
             return instance.getId();
         }
         return "";
@@ -190,12 +204,12 @@ public class CuratorBroker<Content>
         if (discovery == null) {
             return Boolean.FALSE;
         }
-        if (!registryMap.containsKey(instanceId)) {
+        if (!instanceMap.containsKey(instanceId)) {
             return Boolean.FALSE;
         }
         try {
-            ServiceInstance<Content> instance = registryMap.get(instanceId);
-            registryMap.remove(instanceId);
+            ServiceInstance<Content> instance = instanceMap.get(instanceId);
+            instanceMap.remove(instanceId);
             discovery.unregisterService(instance);
             log.info("unregister {}", instance);
         } catch (Exception e) {

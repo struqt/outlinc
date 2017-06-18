@@ -13,4 +13,17 @@ public interface ServiceProducer<Content> {
 
     ServiceEntity<Content> produce(String serviceName, Strategy strategy);
 
+    /**
+     * Report an error status when the instance is unavailable.
+     * When error count reaches {@link CuratorConfig#getDownInstanceThreshold()}
+     * the instance will be filtered locally.
+     * When local time elapses {@link CuratorConfig#getDownInstanceTimeoutMs()} ms
+     * the instance will be back again
+     *
+     * @param entity service entity
+     * @see CuratorConfig#getDownInstanceThreshold()
+     * @see CuratorConfig#getDownInstanceTimeoutMs()
+     */
+    void reportError(ServiceEntity<Content> entity);
+
 }
