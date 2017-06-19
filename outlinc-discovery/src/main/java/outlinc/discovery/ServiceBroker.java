@@ -13,4 +13,6 @@ public interface ServiceBroker<Content> extends Closeable {
 
     CharSequence dumpInstanceAll();
 
+    void stop();
+
 }

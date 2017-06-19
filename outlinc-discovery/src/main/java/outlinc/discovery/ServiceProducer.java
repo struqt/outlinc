@@ -9,6 +9,8 @@ public interface ServiceProducer<Content> {
         RoundRobin, Random, Sticky
     }
 
+    CuratorConfig getConfig();
+
     ServiceEntity<Content> produce(String serviceName);
 
     ServiceEntity<Content> produce(String serviceName, Strategy strategy);

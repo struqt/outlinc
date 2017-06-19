@@ -57,6 +57,11 @@ public class CuratorBroker<Content>
     }
 
     @Override
+    public void stop() {
+        CloseableUtils.closeQuietly(this);
+    }
+
+    @Override
     public void close() throws IOException {
         for (ServiceProvider<Content> provider : providerMap.values()) {
             CloseableUtils.closeQuietly(provider);
@@ -82,6 +87,11 @@ public class CuratorBroker<Content>
     }
 
     @Override
+    public CuratorConfig getConfig() {
+        return config;
+    }
+
+    @Override
     public ServiceEntity<Content> produce(String serviceName) {
         return produce(serviceName, config.getProviderStrategy());
     }
@@ -92,35 +102,13 @@ public class CuratorBroker<Content>
             return null;
         }
         ServiceInstance<Content> instance = null;
-        if (providerMap.containsKey(serviceName)) {
+        ServiceProvider<Content> provider = fetchProvider(serviceName, strategy);
+        if (provider != null) {
             try {
-                instance = providerMap.get(serviceName).getInstance();
+                instance = provider.getInstance();
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
                 providerMap.remove(serviceName);
-            }
-        } else {
-            try {
-                Collection<ServiceInstance<Content>> instances =
-                    discovery.queryForInstances(serviceName);
-                if (instances.size() > 0) {
-                    ServiceProvider<Content> provider = discovery
-                        .serviceProviderBuilder()
-                        .serviceName(serviceName)
-                        .providerStrategy(makeProviderStrategy(strategy))
-                        //.threadFactory()
-                        //.additionalFilter()
-                        .downInstancePolicy(new DownInstancePolicy(
-                            config.getDownInstanceTimeoutMs(),
-                            TimeUnit.MILLISECONDS,
-                            config.getDownInstanceThreshold()))
-                        .build();
-                    provider.start();
-                    providerMap.put(serviceName, provider);
-                    instance = provider.getInstance();
-                }
-            } catch (Exception e) {
-                log.error(e.getMessage(), e);
             }
         }
         if (instance != null) {
@@ -268,26 +256,60 @@ public class CuratorBroker<Content>
             if (discovery != null) {
                 return;
             }
+            int timeoutSess = Math.max(3000, config.getSessionTimeoutMs());
+            int timeoutConn = Math.max(2000, config.getConnectionTimeoutMs());
+            CuratorFramework client = CuratorFrameworkFactory
+                .newClient(config.getConnectString(), timeoutSess, timeoutConn, new RetryOneTime(1));
+            client.getCuratorListenable().addListener(this);
+            client.start();
+            discovery = ServiceDiscoveryBuilder
+                .builder(contentClass)
+                .client(client)
+                .serializer(new JsonInstanceSerializer<Content>(contentClass))
+                .watchInstances(config.getWatchInstances())
+                .basePath(config.getBasePath())
+                .build();
         }
-        int timeoutSess = Math.max(3000, config.getSessionTimeoutMs());
-        int timeoutConn = Math.max(2000, config.getConnectionTimeoutMs());
-        CuratorFramework client = CuratorFrameworkFactory
-            .newClient(config.getConnectString(), timeoutSess, timeoutConn, new RetryOneTime(1));
-        client.getCuratorListenable().addListener(this);
-        client.start();
-        discovery = ServiceDiscoveryBuilder
-            .builder(contentClass)
-            .client(client)
-            .serializer(new JsonInstanceSerializer<Content>(contentClass))
-            .watchInstances(config.getWatchInstances())
-            .basePath(config.getBasePath())
-            .build();
         try {
             discovery.start();
         } catch (Exception e) {
             discovery = null;
             log.error("Curator Init failed", e);
         }
+    }
+
+    private ServiceProvider<Content> fetchProvider(String serviceName, Strategy strategy) {
+        if (providerMap.containsKey(serviceName)) {
+            try {
+                return providerMap.get(serviceName);
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+                providerMap.remove(serviceName);
+            }
+        }
+        try {
+            Collection<ServiceInstance<Content>> instances =
+                discovery.queryForInstances(serviceName);
+            if (instances.size() > 0) {
+                ServiceProvider<Content> provider = discovery
+                    .serviceProviderBuilder()
+                    .serviceName(serviceName)
+                    .providerStrategy(makeProviderStrategy(strategy))
+                    //.threadFactory()
+                    //.additionalFilter()
+                    .downInstancePolicy(new DownInstancePolicy(
+                        config.getDownInstanceTimeoutMs(),
+                        TimeUnit.MILLISECONDS,
+                        config.getDownInstanceThreshold()))
+                    .build();
+                provider.start();
+                providerMap.put(serviceName, provider);
+                return provider;
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        return null;
     }
 
     protected ProviderStrategy<Content> makeProviderStrategy(Strategy strategy) {
