@@ -16,10 +16,12 @@
     <version.slf4j>1.7.21</version.slf4j>
     <version.logback>1.1.11</version.logback>
     <version.curator>2.12.0</version.curator>
+    <version.netty>4.1.12.Final</version.netty>
   </properties>
 
   <modules>
     <module>outlinc-discovery</module>
+    <module>outlinc-proxy</module>
   </modules>
 
   <url>http://www.struqt.com/outlinc</url>
@@ -43,6 +45,11 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>com.struqt</groupId>
+        <artifactId>outlinc-discovery</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>${version.junit}</version>
@@ -58,6 +65,11 @@
         <version>${version.logback}</version>
       </dependency>
       <dependency>
+        <groupId>org.skife.config</groupId>
+        <artifactId>config-magic</artifactId>
+        <version>0.17</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-x-discovery</artifactId>
         <version>${version.curator}</version>
@@ -66,6 +78,21 @@
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-test</artifactId>
         <version>${version.curator}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-codec-http</artifactId>
+        <version>${version.netty}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-handler</artifactId>
+        <version>${version.netty}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-handler-proxy</artifactId>
+        <version>${version.netty}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
