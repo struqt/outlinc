@@ -192,6 +192,9 @@ public class CuratorBroker<Content>
         if (discovery == null) {
             return Boolean.FALSE;
         }
+        if (instanceId == null) {
+            return Boolean.FALSE;
+        }
         if (!instanceMap.containsKey(instanceId)) {
             return Boolean.FALSE;
         }
