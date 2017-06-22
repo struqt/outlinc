@@ -1,14 +1,15 @@
 # Outlinc #
 
-Outlinc is a set of basic libraries for Microservice architecture.
+The foundation for building Microservice architecture.
 
 
 ### Modules ###
 
 * outlinc-discovery: Service discovery utilities
+* outlinc-proxy: Reverse proxy server based on service discovery
 
 
 ### Runtime requirements ###
 
-* Java 6+
-* Apache Zookeeper 3.4.8+
+* Java 6 +
+* Apache Zookeeper 3.4.8 +
