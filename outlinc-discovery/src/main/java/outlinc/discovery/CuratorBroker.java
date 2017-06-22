@@ -129,12 +129,22 @@ public class CuratorBroker<Content>
     }
 
     @Override
-    public void reportError(ServiceEntity<Content> entity) {
-        ServiceProvider<Content> provider = providerMap.get(entity.getName());
-        ServiceInstance<Content> instance = instanceMap.get(entity.getInstanceId());
-        if (provider != null && instance != null) {
-            provider.noteError(instance);
+    public boolean reportError(String instanceId) {
+        ServiceInstance<Content> instance = instanceMap.get(instanceId);
+        if (instance == null) {
+            return false;
         }
+        ServiceProvider<Content> provider = providerMap.get(instance.getName());
+        if (provider == null) {
+            return false;
+        }
+        provider.noteError(instance);
+        return true;
+    }
+
+    @Override
+    public boolean reportError(ServiceEntity<Content> entity) {
+        return entity != null && this.reportError(entity.getInstanceId());
     }
 
     @Override

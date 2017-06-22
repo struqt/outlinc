@@ -13,6 +13,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import static org.junit.Assert.assertTrue;
+
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class ServiceDiscoveryTest {
 
@@ -65,16 +67,10 @@ public class ServiceDiscoveryTest {
         final String serviceName = "test.e";
         service.registry().register(serviceName, "Service Contents e");
         ServiceProducer<String> producer = service.producer();
-        for (int i = 0; i < 2; i++) {
-            ServiceEntity<String> entity = producer.produce(serviceName);
-            producer.reportError(entity);
-            Assert.assertNotNull(entity);
-            log.info(entity.toString());
-        }
         ServiceEntity<String> entity = producer.produce(serviceName);
-        Assert.assertNull(entity);
+        Assert.assertNotNull(entity);
+        assertTrue(producer.reportError(entity));
     }
-
 
     private ServiceBroker<String> service = null;
 

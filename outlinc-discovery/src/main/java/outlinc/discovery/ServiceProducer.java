@@ -22,10 +22,12 @@ public interface ServiceProducer<Content> {
      * When local time elapses {@link CuratorConfig#getDownInstanceTimeoutMs()} ms
      * the instance will be back again
      *
-     * @param entity service entity
+     * @param instanceId UUID of service instance
      * @see CuratorConfig#getDownInstanceThreshold()
      * @see CuratorConfig#getDownInstanceTimeoutMs()
      */
-    void reportError(ServiceEntity<Content> entity);
+    boolean reportError(String instanceId);
+
+    boolean reportError(ServiceEntity<Content> entity);
 
 }
